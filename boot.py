@@ -69,13 +69,20 @@ def send_bad_request(conn, msg=""):
     if msg:
         conn.send(msg)
 
-def send_image(conn, img):
+def resp_ok(conn, body, headers={}):
     conn.send(b"HTTP/1.1 200 OK\r\n")
-    conn.send(b"Content-Type: image/jpeg\r\n")
-    conn.send(b"Content-Length: " + str(len(img)).encode() + b"\r\n")
-    conn.send(b"Connection: close\r\n")
+    for h in headers.keys():
+        conn.send((h + ": " + headers[h] + "\r\n").encode())
+    if type(body) == str:
+        body = body.encode()
+    conn.send(("Content-Length: " + str(len(body)) + "\r\n").encode())
     conn.send(b"\r\n")
-    conn.send(img)
+    conn.send(body)
+        
+def send_image(conn, img):
+    resp_ok(conn, img, {
+        "Content-Type": "image/jpeg",
+        "Content-Length": str(len(img))})
     
 def send_metrics(conn):
     metrics = (
@@ -83,30 +90,16 @@ def send_metrics(conn):
         "# TYPE captured_images counter",
         f"captured_images {captured_images}"
     )
-    conn.send(b"HTTP/1.1 200 OK\r\n")
-    conn.send(b"Content-Type: text/plain\r\n")
-    conn.send(b"Connection: close\r\n")
-    conn.send(b"\r\n")
-    for m in metrics:
-        conn.send(m.encode() + b"\r\n")
-
-def send_ok(conn):
-    conn.send(b"HTTP/1.1 200 OK\r\n")
-    conn.send(b"Content-Type: text/plain\r\n")
-    conn.send(b"Connection: close\r\n")
-    conn.send(b"\r\n")
-    conn.send(b"OK\r\n")
+    resp_ok(conn, "".join([m + "\r\n" for m in metrics]), {"Content-Type": "text/plain"})
 
 def send_index(conn):
-    conn.send(b"HTTP/1.0 200 OK\r\n")
-    conn.send(b"Content-Type: text/html\r\n")
-    conn.send(b"Connection: close\r\n")
-    conn.send(b"\r\n")
-    conn.send(b"<html><head><title>esp32camera</title></head>\r\n")
-    conn.send(b"<body>\r\n")
-    conn.send(b"<p>Image:</p><img src='/image'></img>\r\n")
-    conn.send(b"</body>\r\n")
-    conn.send(b"</html>\r\n")
+    body = """
+    <html><head><title>esp32camera</title></head>
+    <body>
+    <p>Image:</p><img src='/image'></img>
+    </body></html>
+    """
+    resp_ok(conn, body, {"Content-Type": "text/html"})
 
 def req_is(req, value):
     return len(req) > 0 and req[0].startswith(value)
@@ -145,7 +138,7 @@ def main_loop():
                 send_metrics(conn)
             elif req_is(req, b"GET /health "):
                 print("Request for health")
-                send_ok(conn)
+                resp_ok(conn, "OK", {"Content-Type": "text/plain"})
             else:
                 print("Invalid request:", req[0])
                 send_bad_request(conn, req[0])
