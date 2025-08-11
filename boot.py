@@ -127,13 +127,20 @@ def main_loop(sock):
     blink(3, delay=0.2)
     conn = None
     while True:
-        print("Waiting for connection")
         try:
-            conn, addr = sock.accept()
-            blink(1)
-            print("Connection from:", addr)
-            req = conn.recv(1024).splitlines()
-            if req_is(req, "GET / "):
+            if not conn:
+                print("Waiting for connection")
+                conn, addr = sock.accept()
+                conn.settimeout(10)
+                print("Connection from:", addr)
+                blink(1)
+            print("Receiving...")
+            req = conn.recv(10240).splitlines()
+            if len(req) == 0:
+                print("Close connection")
+                conn.close()
+                conn = None
+            elif req_is(req, "GET / "):
                 print("Request for index")
                 send_index(conn)
             elif req_is(req, "GET /image "):
@@ -153,15 +160,17 @@ def main_loop(sock):
             else:
                 print("Invalid request:", req[0])
                 send_bad_request(conn, req[0])
+        except TimeoutError:
+            conn.close()
+            conn = None
+        except Exception as ex:
+            print("Error:", ex)
+            conn.close()
+            conn = None
         except KeyboardInterrupt:
             print("Interrupted")
             sock.close()
             break
-        except Exception as ex:
-            print("Error:", ex)
-        finally:
-            if conn:
-                conn.close()
             
 # ============================================================================================
 
