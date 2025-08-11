@@ -38,6 +38,18 @@ def connect_wifi():
         while not wlan.isconnected():
             blink(1)
     print("Network config:", wlan.ifconfig())
+    
+def make_sock():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            sock.bind(("0.0.0.0", 8018))
+            break
+        except OSError:
+            print("Cannot bind. Wait for a while and try again")
+            blink(5)
+    sock.listen()
+    return sock
 
 def init_camera():
     blink(2, delay=0.2)
@@ -78,7 +90,14 @@ def resp_ok(conn, body, headers={}):
     conn.send(("Content-Length: " + str(len(body)) + "\r\n").encode())
     conn.send(b"\r\n")
     conn.send(body)
-        
+
+def resp_not_found(conn):
+    body = b"Not found"
+    conn.send(b"HTTP/1.1 404 Not Found\r\n")
+    conn.send(("Content-Length: " + str(len(body)) + "\r\n").encode())
+    conn.send(b"\r\n")
+    conn.send(body)
+    
 def send_image(conn, img):
     resp_ok(conn, img, {
         "Content-Type": "image/jpeg",
@@ -102,22 +121,11 @@ def send_index(conn):
     resp_ok(conn, body, {"Content-Type": "text/html"})
 
 def req_is(req, value):
-    return len(req) > 0 and req[0].startswith(value)
+    return len(req) > 0 and req[0].decode().startswith(value)
     
-def main_loop():
+def main_loop(sock):
     blink(3, delay=0.2)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn = None
-
-    while True:
-        try:
-            sock.bind(("0.0.0.0", 8018))
-            break
-        except OSError:
-            print("Cannot bind. Wait for a while and try again")
-            sleep(15)
-    sock.listen(1)
-
     while True:
         print("Waiting for connection")
         try:
@@ -125,20 +133,23 @@ def main_loop():
             blink(1)
             print("Connection from:", addr)
             req = conn.recv(1024).splitlines()
-            if req_is(req, b"GET / "):
+            if req_is(req, "GET / "):
                 print("Request for index")
                 send_index(conn)
-            elif req_is(req, b"GET /image "):
+            elif req_is(req, "GET /image "):
                 print("Request for image")
                 img = capture_image()
                 print(f"Image nr {captured_images}, size: {len(img)}")
                 send_image(conn, img)
-            elif req_is(req, b"GET /metrics "):
+            elif req_is(req, "GET /metrics "):
                 print("Request for metric")
                 send_metrics(conn)
-            elif req_is(req, b"GET /health "):
+            elif req_is(req, "GET /health "):
                 print("Request for health")
                 resp_ok(conn, "OK", {"Content-Type": "text/plain"})
+            elif req_is(req, "GET "):
+                print("Request not found")
+                resp_not_found(conn)
             else:
                 print("Invalid request:", req[0])
                 send_bad_request(conn, req[0])
@@ -155,5 +166,7 @@ def main_loop():
 # ============================================================================================
 
 connect_wifi()
+sock = make_sock()
 init_camera()
-main_loop()
+main_loop(sock)
+
