@@ -48,7 +48,7 @@ def make_sock():
         except OSError:
             print("Cannot bind. Wait for a while and try again")
             blink(5)
-    sock.listen()
+    sock.listen(5)
     return sock
 
 def init_camera():
@@ -160,7 +160,7 @@ def main_loop(sock):
             else:
                 print("Invalid request:", req[0])
                 send_bad_request(conn, req[0])
-        except TimeoutError:
+        except OSError:
             conn.close()
             conn = None
         except Exception as ex:
