@@ -10,14 +10,14 @@ captured_images = 0
 
 def sleep(n):
     time.sleep(n)
-    
-def blink(n, delay=1):
+
+def blink(n, delay=1.0):
     for i in range(n):
         led.value(1)
         sleep(delay)
         led.value(0)
         sleep(delay)
-        
+
 def connect_wifi():
     blink(1, delay=1)
     wlan = network.WLAN(network.STA_IF)
@@ -32,13 +32,13 @@ def connect_wifi():
         ssid = buf[0:n].decode()
         n = nvs.get_blob("key", buf)
         key = buf[0:n].decode()
-    
+
         print("Connecting to network...")
         wlan.connect(ssid, key)
         while not wlan.isconnected():
             blink(1)
     print("Network config:", wlan.ifconfig())
-    
+
 def make_sock():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while True:
@@ -72,7 +72,7 @@ def capture_image():
     img = camera.capture()
     captured_images += 1
     return img
-    
+
 def send_bad_request(conn, msg=""):
     conn.send(b"HTTP/1.1 400 Bad request\r\n")
     conn.send(b"Content-Type: text/plain\r\n")
@@ -97,12 +97,12 @@ def resp_not_found(conn):
     conn.send(("Content-Length: " + str(len(body)) + "\r\n").encode())
     conn.send(b"\r\n")
     conn.send(body)
-    
+
 def send_image(conn, img):
     resp_ok(conn, img, {
         "Content-Type": "image/jpeg",
         "Content-Length": str(len(img))})
-    
+
 def send_metrics(conn):
     metrics = (
         "# HELP captured_images Total number of images captured",
@@ -122,7 +122,7 @@ def send_index(conn):
 
 def req_is(req, value):
     return len(req) > 0 and req[0].decode().startswith(value)
-    
+
 def main_loop(sock):
     blink(3, delay=0.2)
     conn = None
@@ -171,11 +171,10 @@ def main_loop(sock):
             print("Interrupted")
             sock.close()
             break
-            
+
 # ============================================================================================
 
 connect_wifi()
 sock = make_sock()
 init_camera()
 main_loop(sock)
-

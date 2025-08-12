@@ -13,6 +13,6 @@ class WLAN():
 
     def config(self, dhcp_hostname="", reconnects=-1):
         pass
-    
+
     def ifconfig(self):
         return "fake"
