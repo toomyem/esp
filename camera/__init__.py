@@ -2,7 +2,8 @@
 JPEG = 1
 FRAME_UXGA = 2
 XCLK_20MHz = 3
-PSRAM = 4
+XCLK_10MHz = 4
+PSRAM = 5
 
 def deinit():
     pass
